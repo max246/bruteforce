@@ -19,7 +19,7 @@ var count=0;
 //where are your gekko strategies?
 var strategiesFolder = '../gekko/strategies/';
 //where is your config?
-var configFile = '../gekko/config-backtester.js';
+var configFile = '../gekko/config.js';
 //where is your api server? (default is port 3000)
 //to run the server type node gekko --ui in to the console
 var apiUrl= "http://localhost:3000";
@@ -42,16 +42,16 @@ var parallelqueries = 2;
 //setup params for backtesting
 //fuck json, this is pure arrays as god intended us pony coders to use
 //throw in the candle sizes here
-var candleSizes = [240,480,960];
+var candleSizes = [10];
 //list different history sizes here
 var historySizes = [10,20];
 //ooo this looks fun - this is where you set up the trading pairs and back testing exchange data
 //you can load up as many sets as you like
-var tradingPairs = [["poloniex","btc","eth"],["binance","btc","omg"]];
+var tradingPairs = [["poloniex","BTC","DOGE"]];
 //so this is the number of configs that will be generated with different strategy settings
 //if you multiply this by the number of candle sizes and history sizes and trading pairs you'll get the total number of backtests this sucker will run
 //Note: if you wanna test candle sizes, against the same config setup then just set this to 1. Cute right???
-var numberofruns = 1000;
+var numberofruns = 10;
 
 let dirCont = fs.readdirSync( strategiesFolder );
 
@@ -59,7 +59,7 @@ let dirCont = fs.readdirSync( strategiesFolder );
 
 //so there is another version of this script that will run every single strategy in your strategy file that has an entry in the config but while useful...it was a bit crap when it came to brute forcing shit. So now you have to enter in your strategy name.
 //make sure the strategy has a config entry in the config below
-let strategies = ["SchaffTrendCycle"];
+let strategies = ["RSI"];
 
 
 
@@ -76,61 +76,29 @@ for (var a = 0, len4 = tradingPairs.length; a < len4; a++) {
 				config.watch.currency = tradingPairs[a][1];
 				config.watch.asset = tradingPairs[a][2];				
 				
-					this.baseConfig = {
-						  gekkoConfig: {
-							debug: config.debug,
-							watch: {
-							  exchange: config.watch.exchange,
-							  currency: config.watch.currency,
-							  asset: config.watch.asset,									
-							},
-							SchaffTrendCycle: {
-							  "stcLength": randomExt.integer(12,1),
-							  "fastLength": randomExt.integer(20,1),
-							  "slowLength": randomExt.integer(80,20),
-							  "factor": 0.5,
-							  "threshold_high": 80,
-							  "threshold_low": 20,
-							  "enable_stop_loss": true,
-							  "stoploss_threshold": 5,
-							  "adjust_false_signal": true,
-							  "threshold_adjustment": 5
-							},							
-							paperTrader: {
-							  slippage: config.paperTrader.slippage,
-							  feeTaker: config.paperTrader.feeTaker,
-							  feeMaker: config.paperTrader.feeMaker,
-							  feeUsing: config.paperTrader.feeUsing,
-							  simulationBalance: config.paperTrader.simulationBalance,
-							  reportRoundtrips: true,
-							  enabled: true
-							},
-							tradingAdvisor: {
-							  enabled: true,
-							  method: config.tradingAdvisor.method,
-							  candleSize: config.tradingAdvisor.candleSize ,
-							  historySize: config.tradingAdvisor.historySize ,					  
-							},
-							trader: {
-							  enabled: false,
-							},
-							backtest: {
-							  daterange: config.backtest.daterange
-							},
-							performanceAnalyzer: {
-							  'riskFreeReturn': 5,
-							  'enabled': true
-							},
-							valid: true,
-						  },
-						  data: {
-							candleProps: ['close', 'start', 'open', 'high', 'volume','vwp'],
-							indicatorResults: false,
-							report: true,
-							roundtrips: false,
-							trades: false
-						  }
-						};
+					this.baseConfig =  {"watch":
+                                           {"exchange":config.watch.exchange,"currency":config.watch.currency,"asset":config.watch.asset,},
+                                        "paperTrader":{
+                                                "feeMaker":config.paperTrader.feeMaker,
+                                                "feeTaker":config.paperTrader.feeTaker,
+                                                "feeUsing":config.paperTrader.feeUsing,
+                                                "slippage":config.paperTrader.slippage,
+                                                "simulationBalance":config.paperTrader.simulationBalance,
+                                                "reportRoundtrips":true,
+                                                "enabled":true},
+                                        "tradingAdvisor":{
+                                                "enabled":true,
+                                                "method":config.tradingAdvisor.method,
+                                                "candleSize":config.tradingAdvisor.candleSize,
+                                                "historySize":config.tradingAdvisor.historySize 
+                                        },
+                                        "RSI":{"interval":randomExt.integer(40,12),"thresholds":{"low":randomExt.integer(50,10),"high":randomExt.integer(200,10),"persistence":1}},
+                                        "backtest":{"daterange":{"from":"2018-06-09T15:49:00Z","to":"2018-08-29T23:45:00Z"}},
+                                        "backtestResultExporter":{"enabled":true,"writeToDisk":false,
+                                            "data":{"stratUpdates":false,"roundtrips":true,"stratCandles":true,"stratCandleProps":['close', 'start', 'open', 'high', 'volume','vwp'],"trades":true}},
+                                        "performanceAnalyzer":{"riskFreeReturn":2,"enabled":true},
+                                        "valid":true};
+
 						configs.push(this.baseConfig);
 			}
 		}
@@ -146,8 +114,7 @@ hitApi(configs);
 //this might look familiar...that's cos it's ripped from Gekkoga <3
 async function hitApi(configs){
     const results = await queue(configs, parallelqueries, async (data) => {
-
-	console.log("Running strategy - "+data.gekkoConfig.tradingAdvisor.method +" on "+data.gekkoConfig.tradingAdvisor.candleSize +" minute(s) candle size on "+ data.gekkoConfig.watch.exchange +" for "+ data.gekkoConfig.watch.currency + data.gekkoConfig.watch.asset);
+	console.log("Running strategy - "+data.tradingAdvisor.method +" on "+data.tradingAdvisor.candleSize +" minute(s) candle size on "+ data.watch.exchange +" for "+ data.watch.currency + data.watch.asset);
       const body = await rp.post({
         url: `${apiUrl}/api/backtest`,
         json: true,
@@ -159,8 +126,10 @@ async function hitApi(configs){
       // These properties will be outputted every epoch, remove property if not needed
       const properties = ['balance', 'profit', 'sharpe', 'market', 'relativeProfit', 'yearlyProfit', 'relativeYearlyProfit', 'startPrice', 'endPrice', 'trades'];
 	  
+if (!body.performanceReport) return null;
 
-      const report = body.report;
+      const report = body.performanceReport;
+
       let result = { profit: 0, metrics: false };
 
       if (report) {
@@ -173,7 +142,7 @@ async function hitApi(configs){
 
         }, {});
 
-        result = { strat: data.gekkoConfig.tradingAdvisor.method, startdate: data.gekkoConfig.backtest.daterange.from, todate: data.gekkoConfig.backtest.daterange.to, profit: body.report.profit, sharpe: body.report.sharpe, metrics: picked };
+        result = { strat: data.tradingAdvisor.method, startdate: data.backtest.daterange.from, todate: data.backtest.daterange.to, profit: body.performanceReport.profit, sharpe: body.performanceReport.sharpe, metrics: picked };
       }
 
 //now we write the backtest results to file:
@@ -181,14 +150,14 @@ async function hitApi(configs){
 			let runDate = humanize.date('d-m-Y');
 			let runTime = humanize.date('H:i:s');		
 			var sharpe = 0;
-			if(report.sharpe){
-				sharpe = report.sharpe;
-			}
-			let currencyPair = report.currency+report.asset;
-			let configCsvTmp1 = JSON.stringify(data.gekkoConfig[data.gekkoConfig.tradingAdvisor.method]);
+			//if(report.performanceReport.sharpe){
+			//	sharpe = report.performanceReport.sharpe;
+			//}
+			let currencyPair = "currency dunno";//report.currency+report.asset;
+			let configCsvTmp1 = JSON.stringify(data[data.tradingAdvisor.method]);
 			let configCsv = replaceall(",", "|", configCsvTmp1)
 			headertxt = "Strategy, Market performance(%),Strat performance (%),Profit,Run date, Run time, Start date, End date,Currency pair, Candle size, History size,Currency, Asset, Timespan,Yearly profit, Yearly profit (%), Start price, End price, Trades, Start balance, Sharpe, Alpha, Config\n";
-			outtxt = data.gekkoConfig.tradingAdvisor.method+","+ report.market+","+ report.relativeProfit+","+ report.profit+","+runDate+","+runTime+","+ data.gekkoConfig.backtest.daterange.from+","+ data.gekkoConfig.backtest.daterange.to+","+ currencyPair+","+ data.gekkoConfig.tradingAdvisor.candleSize+","+ data.gekkoConfig.tradingAdvisor.historySize+","+ report.currency+","+ report.asset+","+ report.timespan+","+ report.yearlyProfit+","+ report.relativeYearlyProfit+","+ report.startPrice+","+ report.endPrice+","+ report.trades+","+ report.startBalance+","+ sharpe+","+ report.alpha+","+ configCsv+"\n";	
+			outtxt = data.tradingAdvisor.method+","+ report.market+","+ report.relativeProfit+","+ report.profit+","+runDate+","+runTime+","+ data.backtest.daterange.from+","+ data.backtest.daterange.to+","+ currencyPair+","+ data.tradingAdvisor.candleSize+","+ data.tradingAdvisor.historySize+","+ report.currency+","+ report.asset+","+ report.timespan+","+ report.yearlyProfit+","+ report.relativeYearlyProfit+","+ report.startPrice+","+ report.endPrice+","+ report.trades+","+ report.startBalance+","+ sharpe+","+ report.alpha+","+ configCsv+"\n";	
 
 			if (fs.existsSync(resultCsv)){
 				fs.appendFileSync(resultCsv, outtxt, encoding = 'utf8');		
@@ -203,12 +172,12 @@ async function hitApi(configs){
 			
 		} 
 
-  
+  console.log(result);
 		return result;
 
     })
 	.catch((err)=>{
-		//console.log(err)
+		console.log(err)
 		throw err
 	});
 	return results;
