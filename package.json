@@ -1,5 +1,5 @@
 {
-  "name": "Gekko Warez Bruteforce Backtester",
+  "name": "Gekko",
   "version": "1.0.0",
   "description": "A swiss army nodejs brute force backtester for Gekko trading bot. Saves time so you can spend more time looking good. ",
   "main": "bruteforce.js",
